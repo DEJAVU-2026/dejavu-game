@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DEJAVU - 3D MOBA Arena</title>
+    <!-- Підключаємо бібліотеку Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0a0a1a;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        #game-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* --- ВЕРХНІЙ МІНІМАЛІСТИЧНИЙ HUD --- */
+        .hud-container {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: rgba(10, 10, 30, 0.6);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            padding: 8px 14px;
+            border-radius: 8px;
+            pointer-events: auto;
+            min-width: 160px;
+        }
+        .player-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #fff;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        .hp-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: #331111;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 0, 0, 0.3);
+        }
+        .hp-bar-fill {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #ff3366, #ff0033);
+            transition: width 0.2s ease;
+        }
+        .stats-row {
+            display: flex;
+            gap: 12px;
+            color: #ffcc00;
+            font-size: 11px;
+            margin-top: 2px;
+        }
+
+        /* --- КОМПАКТНИЙ РАДАР (МІНІКАРТА) --- */
+        #minimap {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 75px;
+            height: 75px;
+            border-radius: 50%;
+            background: rgba(10, 10, 30, 0.7);
+            border: 2px solid rgba(0, 255, 255, 0.4);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+        }
+
+        /* --- НАЗВА ПОТОЧНОЇ ЗОНИ --- */
+        #zone-banner {
+            position: absolute;
+            top: 110px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #00ffff;
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+            text-align: center;
+        }
+
+        /* --- МОБІЛЬНЕ КЕРУВАННЯ (АКУРАТНО ПО КУТАХ) --- */
+        .controls-layer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 160px;
+            pointer-events: none; /* Пропускає кліки на 3D сцену */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 30px 20px 30px;
+        }
+        .joystick-zone {
+            width: 110px;
+            height: 110px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+        }
+        .joystick-stick {
+            width: 45px;
+            height: 45px;
+            background: radial-gradient(circle, #3a3a5a, #1a1a2e);
+            border: 2px solid rgba(0, 255, 255, 0.4);
+            border-radius: 50%;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .action-zone {
+            display: flex;
+            align-items: flex-end;
+            gap: 15px;
+            pointer-events: auto;
+        }
+        .btn-game {
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: bold;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+        }
+        .btn-game:active { 
+            transform: scale(0.92); 
+        }
+        .btn-skill {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #1d4ed8, #1e40af);
+            border-color: #3b82f6;
+            font-size: 11px;
+        }
+        .btn-attack {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #991b1b, #7f1d1d);
+            border-color: #ef4444;
+            font-size: 14px;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Полотно гри -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Інтерфейс гравця (HUD) -->
+    <div class="hud-container">
+        <div class="player-info">
+            <span>Градіатор</span>
+            <span style="color: #00ffff;">LVL 1</span>
+        </div>
+        <div class="hp-bar-bg">
+            <div class="hp-bar-fill"></div>
+        </div>
+        <div class="stats-row">
+            <span>💰 Золото: <strong id="gold-txt">0</strong></span>
+            <span>💀 Вбивства: 0</span>
+        </div>
+    </div>
+
+    <!-- Міні-мапа -->
+    <div id="minimap"></div>
+
+    <!-- Назва Зони -->
+    <div id="zone-banner">Центральна Арена</div>
+
+    <!-- Сенсорне керування -->
+    <div class="controls-layer">
+        <div class="joystick-zone" id="joy-zone">
+            <div class="joystick-stick" id="joy-stick"></div>
+        </div>
+        <div class="action-zone">
+            <button class="btn-game btn-skill" onclick="triggerSkill()">SKILL</button>
+            <button class="btn-game btn-attack" onclick="triggerAttack()">ATTACK</button>
+        </div>
+    </div>
+
+    <script>
+        // --- ІНІЦІАЛІЗАЦІЯ THREE.JS (СТИЛЬ МОВА) ---
+        const canvas = document.getElementById('game-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        const scene = new THREE.Scene();
+        // Глибокий темно-синій атмосферний туман, як на картах МОВА
+        scene.background = new THREE.Color(0x050510);
+        scene.fog = new THREE.FogExp2(0x050510, 0.025);
+
+        // --- КАМЕРА: СУВОРИЙ ІЗОМЕТРИЧНИЙ НАХИЛ (MOBA ANGLE) ---
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        // Зміщуємо камеру вгору і назад, щоб дивитися під кутом 45 градусів
+        camera.position.set(0, 18, 18);
+        camera.lookAt(0, 0, 0);
+
+        // --- ОСВІТЛЕННЯ ТА ТІНІ ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(10, 20, 10);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        dirLight.shadow.camera.near = 0.5;
+        dirLight.shadow.camera.far = 50;
+        const d = 20;
+        dirLight.shadow.camera.left = -d;
+        dirLight.shadow.camera.right = d;
+        dirLight.shadow.camera.top = d;
+        dirLight.shadow.camera.bottom = -d;
+        scene.add(dirLight);
+
+        // --- ЗЕМЛЯ: СУЦІЛЬНА МОХОВО-ЗЕЛЕНА АРЕНА ---
+        const groundGeo = new THREE.PlaneGeometry(60, 60);
+        const groundMat = new THREE.MeshStandardMaterial({ 
+            color: 0x122518, // Стилізований темно-зелений колір карти
+            roughness: 0.8,
+            metalness: 0.1
+        });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Невелика допоміжна сітка поверх суцільної землі для відчуття масштабу
+        const grid = new THREE.GridHelper(60, 30, 0x00ffff, 0x1a3325);
+        grid.position.y = 0.01; 
+        scene.add(grid);
+
+        // --- ГЕРОЙ: СОЛІДНА ОБ'ЄМНА МОДЕЛЬ (ЗАМІСТЬ ЛІНІЙ) ---
+        const playerGroup = new THREE.Group();
+        
+        // Тіло героя (Стилізована капсула)
+        const bodyGeo = new THREE.CylinderGeometry(0.6, 0.6, 1.8, 16);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x00aaff, roughness: 0.4, metalness: 0.5 });
+        const playerBody = new THREE.Mesh(bodyGeo, bodyMat);
+        playerBody.position.y = 0.9;
+        playerBody.castShadow = true;
+        playerGroup.add(playerBody);
+
+        // Напрямок погляду героя (невеликий покажчик попереду)
+        const pointerGeo = new THREE.BoxGeometry(0.3, 0.3, 0.6);
+        const pointerMat = new THREE.MeshStandardMaterial({ color: 0xffcc00 });
+        const pointer = new THREE.Mesh(pointerGeo, pointerMat);
+        pointer.position.set(0, 1.2, 0.6);
+        playerGroup.add(pointer);
+
+        scene.add(playerGroup);
+
+        // --- БУДІВЛЯ: ЦЕНТРАЛЬНИЙ БАНК (СОЛІДНИЙ ОБ'ЄКТ) ---
+        const bankGroup = new THREE.Group();
+        bankGroup.position.set(0, 0, -8); // Трохи попереду камери
+
+        // Основа будівлі
+        const bBaseGeo = new THREE.BoxGeometry(4, 3, 4);
+        const bBaseMat = new THREE.MeshStandardMaterial({ color: 0x2a2a3a, roughness: 0.6 });
+        const bankBase = new THREE.Mesh(bBaseGeo, bBaseMat);
+        bankBase.position.y = 1.5;
+        bankBase.castShadow = true;
+        bankBase.receiveShadow = true;
+        bankGroup.add(bankBase);
+
+        // Дах банку (Купол/Піраміда)
+        const bRoofGeo = new THREE.CylinderGeometry(0, 2.5, 1.5, 4);
+        const bRoofMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.5 });
+        const bankRoof = new THREE.Mesh(bRoofGeo, bRoofMat);
+        bankRoof.position.y = 3.75;
+        bankRoof.rotation.y = Math.PI / 4;
+        bankRoof.castShadow = true;
+        bankGroup.add(bankRoof);
+
+        scene.add(bankGroup);
+
+        // --- СИСТЕМНІ ЛОГИ ПЕРЕНЕСЕНО В КОНСОЛЬ ---
+        console.log("🚀 Сервер DEJAVU: Ініціалізація 3D-світу успішна.");
+        console.log("🎮 Система: Логи UI вимкнено для оптимізації екрана.");
+
+        // --- ГЕЙМПЛЕЙНІ ФУНКЦІЇ (КНОПКИ) ---
+        function triggerAttack() {
+            console.log("⚔️ Бойова система: Атака! Шукаю цілі в радіусі...");
+        }
+
+        function triggerSkill() {
+            console.log("⚡ Механіка: Скілл активовано (Ривок вперед).");
+        }
+
+        // Ревсайз екрана
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // ---ГОЛОВНИЙ ЦИКЛ АНІМАЦІЇ (RENDER LOOP) ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // М'яке обертання даху банку для інтерактивності
+            bankRoof.rotation.y += 0.005;
+
+            // Камера плавно слідує за позицією гравця з фіксованим MOBA-зміщенням
+            camera.position.x = playerGroup.position.x;
+            camera.position.z = playerGroup.position.z + 18;
+
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
