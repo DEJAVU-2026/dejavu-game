@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DEJAVU - 3D MOBA Arena</title>
-    <!-- Підключаємо бібліотеку Three.js -->
+    <title>DEJAVU - Dark MOBA Legends</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         * {
@@ -13,13 +12,13 @@
             box-sizing: border-box;
             user-select: none;
             -webkit-user-select: none;
-            touch-action: none; /* Запобігає зуму та скролу екрана */
+            touch-action: none;
         }
         body, html {
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #0a0a1a;
+            background-color: #05050a;
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
         #game-canvas {
@@ -28,26 +27,58 @@
             display: block;
         }
 
-        /* --- ВЕРХНІЙ МІНІМАЛІСТИЧНИЙ HUD --- */
-        .hud-container {
+        /* --- ПАНЕЛЬ ВИБОРУ ДРЕВНІХ РАС --- */
+        .race-selector {
             position: absolute;
             top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 5px;
+            background: rgba(15, 10, 25, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(139, 0, 0, 0.5);
+            padding: 6px 10px;
+            border-radius: 20px;
+            z-index: 10;
+            pointer-events: auto;
+        }
+        .btn-race {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #b8b8b8;
+            padding: 6px 10px;
+            border-radius: 14px;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-race.active {
+            background: rgba(139, 0, 0, 0.4);
+            border-color: #ff3333;
+            color: #fff;
+            box-shadow: 0 0 12px rgba(255, 0, 0, 0.5);
+        }
+
+        /* --- ВЕРХНІЙ HUD --- */
+        .hud-container {
+            position: absolute;
+            top: 60px;
             left: 12px;
             display: flex;
             flex-direction: column;
             gap: 6px;
-            background: rgba(10, 10, 30, 0.6);
+            background: rgba(15, 10, 25, 0.7);
             backdrop-filter: blur(8px);
-            border: 1px solid rgba(0, 255, 255, 0.2);
+            border: 1px solid rgba(139, 0, 0, 0.3);
             padding: 8px 14px;
             border-radius: 8px;
-            pointer-events: auto;
-            min-width: 160px;
+            min-width: 170px;
         }
         .player-info {
             display: flex;
             justify-content: space-between;
-            align-items: center;
             color: #fff;
             font-size: 13px;
             font-weight: bold;
@@ -55,54 +86,24 @@
         .hp-bar-bg {
             width: 100%;
             height: 8px;
-            background: #331111;
+            background: #2a1111;
             border-radius: 4px;
             overflow: hidden;
-            border: 1px solid rgba(255, 0, 0, 0.3);
+            border: 1px solid rgba(255, 0, 0, 0.4);
         }
         .hp-bar-fill {
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, #ff3366, #ff0033);
-            transition: width 0.2s ease;
+            background: linear-gradient(90deg, #dc2626, #991b1b);
         }
         .stats-row {
             display: flex;
-            gap: 12px;
-            color: #ffcc00;
+            justify-content: space-between;
+            color: #facc15;
             font-size: 11px;
-            margin-top: 2px;
         }
 
-        /* --- КОМПАКТНИЙ РАДАР (МІНІКАРТА) --- */
-        #minimap {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            width: 75px;
-            height: 75px;
-            border-radius: 50%;
-            background: rgba(10, 10, 30, 0.7);
-            border: 2px solid rgba(0, 255, 255, 0.4);
-            box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
-        }
-
-        /* --- НАЗВА ПОТОЧНОЇ ЗОНИ --- */
-        #zone-banner {
-            position: absolute;
-            top: 110px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #00ffff;
-            font-size: 14px;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            text-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
-            text-align: center;
-        }
-
-        /* --- МОБІЛЬНЕ КЕРУВАННЯ --- */
+        /* --- СЕНСОРНЕ КЕРУВАННЯ --- */
         .controls-layer {
             position: absolute;
             bottom: 0;
@@ -118,8 +119,8 @@
         .joystick-zone {
             width: 120px;
             height: 120px;
-            background: rgba(255, 255, 255, 0.08);
-            border: 2px dashed rgba(0, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px dashed rgba(220, 38, 38, 0.3);
             border-radius: 50%;
             display: flex;
             justify-content: center;
@@ -130,12 +131,11 @@
         .joystick-stick {
             width: 50px;
             height: 50px;
-            background: radial-gradient(circle, #00ffff, #005588);
-            border: 2px solid #ffffff;
+            background: radial-gradient(circle, #dc2626, #7f1d1d);
+            border: 2px solid #fca5a5;
             border-radius: 50%;
-            box-shadow: 0 0 12px rgba(0, 255, 255, 0.6);
+            box-shadow: 0 0 12px rgba(220, 38, 38, 0.6);
             position: absolute;
-            will-change: transform;
         }
         .action-zone {
             display: flex;
@@ -151,55 +151,39 @@
             color: white;
             font-weight: bold;
             border: 2px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
-        .btn-game:active { 
-            transform: scale(0.92); 
-        }
-        .btn-skill {
-            width: 55px;
-            height: 55px;
-            background: linear-gradient(135deg, #1d4ed8, #1e40af);
-            border-color: #3b82f6;
-            font-size: 11px;
-        }
-        .btn-attack {
-            width: 75px;
-            height: 75px;
-            background: linear-gradient(135deg, #991b1b, #7f1d1d);
-            border-color: #ef4444;
-            font-size: 14px;
-            box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
-        }
+        .btn-game:active { transform: scale(0.92); }
+        .btn-skill { width: 55px; height: 55px; background: linear-gradient(135deg, #7c3aed, #5b21b6); border-color: #8b5cf6; font-size: 11px; }
+        .btn-attack { width: 75px; height: 75px; background: linear-gradient(135deg, #dc2626, #991b1b); border-color: #f87171; font-size: 14px; }
     </style>
 </head>
 <body>
 
-    <!-- 3D Полотно гри -->
     <canvas id="game-canvas"></canvas>
 
-    <!-- Інтерфейс гравця (HUD) -->
+    <!-- Вибір темних рас -->
+    <div class="race-selector">
+        <button class="btn-race active" onclick="selectRace('werewolf')">🐺 Оборотень</button>
+        <button class="btn-race" onclick="selectRace('ghost')">👻 Привид</button>
+        <button class="btn-race" onclick="selectRace('cadaver')">🧟 Кадавр</button>
+        <button class="btn-race" onclick="selectRace('vampire')">🧛 Вампір</button>
+    </div>
+
+    <!-- HUD -->
     <div class="hud-container">
         <div class="player-info">
-            <span>Градіатор</span>
-            <span style="color: #00ffff;">LVL 1</span>
+            <span id="race-title">Оборотень</span>
+            <span style="color: #ef4444;">LVL 1</span>
         </div>
-        <div class="hp-bar-bg">
-            <div class="hp-bar-fill"></div>
-        </div>
+        <div class="hp-bar-bg"><div class="hp-bar-fill" id="hp-fill"></div></div>
         <div class="stats-row">
-            <span>💰 Золото: <strong id="gold-txt">0</strong></span>
-            <span>💀 Вбивства: 0</span>
+            <span>❤️ HP: <strong id="hp-txt">1200</strong></span>
+            <span>⚡ Швидкість: <strong id="speed-txt">11</strong></span>
         </div>
     </div>
 
-    <!-- Міні-мапа -->
-    <div id="minimap"></div>
-
-    <!-- Назва Зони -->
-    <div id="zone-banner">Центральна Арена</div>
-
-    <!-- Сенсорне керування -->
+    <!-- Керування -->
     <div class="controls-layer">
         <div class="joystick-zone" id="joy-zone">
             <div class="joystick-stick" id="joy-stick"></div>
@@ -211,99 +195,155 @@
     </div>
 
     <script>
-        // --- ІНІЦІАЛІЗАЦІЯ THREE.JS ---
+        // --- THREE.JS SETUP ---
         const canvas = document.getElementById('game-canvas');
         const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x050510);
-        scene.fog = new THREE.FogExp2(0x050510, 0.025);
+        scene.background = new THREE.Color(0x05050a);
+        scene.fog = new THREE.FogExp2(0x05050a, 0.025);
 
-        // --- ТАЙМЕР ДЛЯ СТАБІЛІЗАЦІЇ ШВИДКОСТІ (DELTA TIME) ---
         const clock = new THREE.Clock();
 
-        // --- КАМЕРА (MOBA 45°) ---
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 18, 18);
         camera.lookAt(0, 0, 0);
 
-        // --- ОСВІТЛЕННЯ ---
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
         scene.add(ambientLight);
 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        const dirLight = new THREE.DirectionalLight(0xff4444, 0.6);
         dirLight.position.set(10, 20, 10);
         dirLight.castShadow = true;
         scene.add(dirLight);
 
-        // --- ЗЕМЛЯ ---
-        const groundGeo = new THREE.PlaneGeometry(80, 80);
-        const groundMat = new THREE.MeshStandardMaterial({ color: 0x122518, roughness: 0.8 });
-        const ground = new THREE.Mesh(groundGeo, groundMat);
+        // Темна містична земля
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(80, 80),
+            new THREE.MeshStandardMaterial({ color: 0x0f1410, roughness: 0.9 })
+        );
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
 
-        const grid = new THREE.GridHelper(80, 40, 0x00ffff, 0x1a3325);
-        grid.position.y = 0.01; 
+        const grid = new THREE.GridHelper(80, 40, 0xef4444, 0x1f1b24);
+        grid.position.y = 0.01;
         scene.add(grid);
 
-        // --- ГЕРОЙ ---
+        // --- ДРЕВНЯ РУЇНА / ХРАМ У ЦЕНТРІ ---
+        const templeGroup = new THREE.Group();
+        templeGroup.position.set(0, 0, -10);
+        const templeBase = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 6), new THREE.MeshStandardMaterial({ color: 0x181824, roughness: 0.8 }));
+        templeBase.position.y = 1.5;
+        templeGroup.add(templeBase);
+        const templeRoof = new THREE.Mesh(new THREE.ConeGeometry(4, 2, 4), new THREE.MeshStandardMaterial({ color: 0x7f1d1d }));
+        templeRoof.position.y = 4;
+        templeGroup.add(templeRoof);
+        scene.add(templeGroup);
+
+        // --- ГРУПА ПЕРСОНАЖА ---
         const playerGroup = new THREE.Group();
-        
-        const bodyGeo = new THREE.CylinderGeometry(0.6, 0.6, 1.8, 16);
-        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x00aaff, roughness: 0.4, metalness: 0.5 });
-        const playerBody = new THREE.Mesh(bodyGeo, bodyMat);
-        playerBody.position.y = 0.9;
-        playerBody.castShadow = true;
-        playerGroup.add(playerBody);
-
-        const pointerGeo = new THREE.BoxGeometry(0.3, 0.3, 0.6);
-        const pointerMat = new THREE.MeshStandardMaterial({ color: 0xffcc00 });
-        const pointer = new THREE.Mesh(pointerGeo, pointerMat);
-        pointer.position.set(0, 1.2, 0.6);
-        playerGroup.add(pointer);
-
         scene.add(playerGroup);
 
-        // --- БУДІВЛЯ: БАНК ---
-        const bankGroup = new THREE.Group();
-        bankGroup.position.set(0, 0, -10);
+        let currentRaceModel = null;
+        let baseSpeed = 11;
+        let isFloating = false;
 
-        const bankBase = new THREE.Mesh(
-            new THREE.BoxGeometry(5, 3, 5),
-            new THREE.MeshStandardMaterial({ color: 0x2a2a3a })
-        );
-        bankBase.position.y = 1.5;
-        bankBase.castShadow = true;
-        bankGroup.add(bankBase);
+        // --- ГЕНЕРАТОР 3D МОДЕЛЕЙ ДЛЯ 4 ДРЕВНІХ РАС ---
+        function buildRaceModel(race) {
+            if (currentRaceModel) playerGroup.remove(currentRaceModel);
+            
+            const raceGroup = new THREE.Group();
+            isFloating = false;
 
-        const bankRoof = new THREE.Mesh(
-            new THREE.CylinderGeometry(0, 3.2, 2, 4),
-            new THREE.MeshStandardMaterial({ color: 0x991b1b })
-        );
-        bankRoof.position.y = 4;
-        bankRoof.rotation.y = Math.PI / 4;
-        bankRoof.castShadow = true;
-        bankGroup.add(bankRoof);
+            if (race === 'werewolf') {
+                // Оборотень: дикий рудувато-темний воїн із плечовими шипами
+                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.5, 1.9, 16), new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.7 }));
+                body.position.y = 0.95;
+                raceGroup.add(body);
 
-        scene.add(bankGroup);
+                const clawL = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 8), new THREE.MeshStandardMaterial({ color: 0x78350f }));
+                clawL.position.set(-0.6, 1.5, 0.2);
+                clawL.rotation.x = 0.5;
+                raceGroup.add(clawL);
 
-        // --- ЛОГІКА СЕНСОРНОГО ДЖОЙСТИКА ---
+                const clawR = clawL.clone();
+                clawR.position.x = 0.6;
+                raceGroup.add(clawR);
+
+                baseSpeed = 11.5;
+                document.getElementById('race-title').innerText = '🐺 Оборотень';
+                document.getElementById('hp-txt').innerText = '1200';
+
+            } else if (race === 'ghost') {
+                // Привид: напівпрозорий бірюзово-білий дух, що левитує
+                isFloating = true;
+                const body = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2.2, 16), new THREE.MeshStandardMaterial({ color: 0x2dd4bf, transparent: true, opacity: 0.65, emissive: 0x0d9488 }));
+                body.position.y = 1.1;
+                raceGroup.add(body);
+
+                const core = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 12), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+                core.position.set(0, 1.8, 0);
+                raceGroup.add(core);
+
+                baseSpeed = 13.5; // Найшвидший
+                document.getElementById('race-title').innerText = '👻 Привид';
+                document.getElementById('hp-txt').innerText = '800';
+
+            } else if (race === 'cadaver') {
+                // Кадавр: масивна похмура нежить фіолетового відтінку
+                const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.8, 0.7), new THREE.MeshStandardMaterial({ color: 0x3b2b46, roughness: 0.9 }));
+                body.position.y = 0.9;
+                raceGroup.add(body);
+
+                const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.6), new THREE.MeshStandardMaterial({ color: 0x4a3b5c }));
+                head.position.set(0, 1.9, 0);
+                raceGroup.add(head);
+
+                baseSpeed = 9.0; // Повільний та витривалий
+                document.getElementById('race-title').innerText = '🧟 Кадавр';
+                document.getElementById('hp-txt').innerText = '1500';
+
+            } else if (race === 'vampire') {
+                // Вампір: елегантний чорно-червоний аристократ ночі
+                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 2.0, 16), new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.3 }));
+                body.position.y = 1.0;
+                raceGroup.add(body);
+
+                const cape = new THREE.Mesh(new THREE.ConeGeometry(0.7, 1.8, 4), new THREE.MeshStandardMaterial({ color: 0x991b1b }));
+                cape.position.set(0, 1.0, -0.2);
+                cape.rotation.y = Math.PI / 4;
+                raceGroup.add(cape);
+
+                baseSpeed = 12.0;
+                document.getElementById('race-title').innerText = '🧛 Вампір';
+                document.getElementById('hp-txt').innerText = '950';
+            }
+
+            document.getElementById('speed-txt').innerText = baseSpeed;
+            currentRaceModel = raceGroup;
+            playerGroup.add(currentRaceModel);
+        }
+
+        buildRaceModel('werewolf');
+
+        function selectRace(race) {
+            const btns = document.querySelectorAll('.btn-race');
+            btns.forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            buildRaceModel(race);
+        }
+
+        // --- ДЖОЙСТИК ТА РУХ ---
         const joyZone = document.getElementById('joy-zone');
         const joyStick = document.getElementById('joy-stick');
         let isDragging = false;
         let moveVector = { x: 0, z: 0 };
-        const baseSpeed = 10; // Стабільна швидкість: 10 одиниць на секунду
 
-        function handleStart(e) {
-            isDragging = true;
-        }
-
+        function handleStart() { isDragging = true; }
         function handleMove(e) {
             if (!isDragging) return;
             const touch = e.touches ? e.touches[0] : e;
@@ -322,7 +362,6 @@
             }
 
             joyStick.style.transform = `translate(${dx}px, ${dy}px)`;
-
             moveVector.x = dx / maxRadius;
             moveVector.z = dy / maxRadius;
         }
@@ -341,8 +380,8 @@
         window.addEventListener('mousemove', handleMove);
         window.addEventListener('mouseup', handleEnd);
 
-        function triggerAttack() { console.log("⚔️ Атака!"); }
-        function triggerSkill() { console.log("⚡ Скілл!"); }
+        function triggerAttack() { console.log("⚔️ Темна атака!"); }
+        function triggerSkill() { console.log("⚡ Магічний скілл!"); }
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
@@ -350,15 +389,14 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // --- РЕНДЕР-ЦИКЛ (З ПРИВ'ЯЗКОЮ ДО РЕАЛЬНОГО ЧАСУ) ---
+        // --- РЕНДЕР ЦИКЛ ---
+        let timeTracker = 0;
         function animate() {
             requestAnimationFrame(animate);
-
-            // Отримуємо час у секундах з попереднього кадру
             const delta = clock.getDelta();
+            timeTracker += delta;
 
             if (moveVector.x !== 0 || moveVector.z !== 0) {
-                // Швидкість множиться на delta — це гарантує плавний рух незалежно від FPS
                 const moveStep = baseSpeed * delta;
                 playerGroup.position.x += moveVector.x * moveStep;
                 playerGroup.position.z += moveVector.z * moveStep;
@@ -367,11 +405,15 @@
                 playerGroup.rotation.y = angle;
             }
 
-            // Плавне слідування камери
+            // Ефект левітації для привиде
+            if (isFloating) {
+                playerGroup.position.y = Math.sin(timeTracker * 5) * 0.25;
+            } else {
+                playerGroup.position.y = 0;
+            }
+
             camera.position.x = playerGroup.position.x;
             camera.position.z = playerGroup.position.z + 18;
-
-            bankRoof.rotation.y += 0.5 * delta;
 
             renderer.render(scene, camera);
         }
