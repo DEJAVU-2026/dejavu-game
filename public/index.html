@@ -13,7 +13,7 @@
             box-sizing: border-box;
             user-select: none;
             -webkit-user-select: none;
-            touch-action: none; /* Запобігає зуму та скролу екрана під час гри */
+            touch-action: none; /* Запобігає зуму та скролу екрана */
         }
         body, html {
             width: 100%;
@@ -223,7 +223,10 @@
         scene.background = new THREE.Color(0x050510);
         scene.fog = new THREE.FogExp2(0x050510, 0.025);
 
-        // --- КАМЕРА: СУВОРИЙ ІЗОМЕТРИЧНИЙ НАХИЛ (45°) ---
+        // --- ТАЙМЕР ДЛЯ СТАБІЛІЗАЦІЇ ШВИДКОСТІ (DELTA TIME) ---
+        const clock = new THREE.Clock();
+
+        // --- КАМЕРА (MOBA 45°) ---
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 18, 18);
         camera.lookAt(0, 0, 0);
@@ -235,8 +238,6 @@
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
         dirLight.position.set(10, 20, 10);
         dirLight.castShadow = true;
-        dirLight.shadow.mapSize.width = 1024;
-        dirLight.shadow.mapSize.height = 1024;
         scene.add(dirLight);
 
         // --- ЗЕМЛЯ ---
@@ -261,7 +262,6 @@
         playerBody.castShadow = true;
         playerGroup.add(playerBody);
 
-        // Покажчик напрямку обличчя героя
         const pointerGeo = new THREE.BoxGeometry(0.3, 0.3, 0.6);
         const pointerMat = new THREE.MeshStandardMaterial({ color: 0xffcc00 });
         const pointer = new THREE.Mesh(pointerGeo, pointerMat);
@@ -270,7 +270,7 @@
 
         scene.add(playerGroup);
 
-        // --- БУДІВЛЯ: ЦЕНТРАЛЬНИЙ БАНК ---
+        // --- БУДІВЛЯ: БАНК ---
         const bankGroup = new THREE.Group();
         bankGroup.position.set(0, 0, -10);
 
@@ -298,7 +298,7 @@
         const joyStick = document.getElementById('joy-stick');
         let isDragging = false;
         let moveVector = { x: 0, z: 0 };
-        const moveSpeed = 0.15; // Швидкість бігу героя
+        const baseSpeed = 10; // Стабільна швидкість: 10 одиниць на секунду
 
         function handleStart(e) {
             isDragging = true;
@@ -323,7 +323,6 @@
 
             joyStick.style.transform = `translate(${dx}px, ${dy}px)`;
 
-            // Нормалізуємо значення від -1 до 1
             moveVector.x = dx / maxRadius;
             moveVector.z = dy / maxRadius;
         }
@@ -334,23 +333,16 @@
             moveVector = { x: 0, z: 0 };
         }
 
-        // Події для тачскріна смартфона
-        joyZone.addEventListener('touchstart', handleStart);
-        window.addEventListener('touchmove', handleMove);
+        joyZone.addEventListener('touchstart', handleStart, { passive: true });
+        window.addEventListener('touchmove', handleMove, { passive: true });
         window.addEventListener('touchend', handleEnd);
 
-        // Події для мишки (для тестування на ПК)
         joyZone.addEventListener('mousedown', handleStart);
         window.addEventListener('mousemove', handleMove);
         window.addEventListener('mouseup', handleEnd);
 
-        // Кнопки дій
-        function triggerAttack() {
-            console.log("⚔️ Атака!");
-        }
-        function triggerSkill() {
-            console.log("⚡ Скілл!");
-        }
+        function triggerAttack() { console.log("⚔️ Атака!"); }
+        function triggerSkill() { console.log("⚡ Скілл!"); }
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
@@ -358,25 +350,28 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // --- ГОЛОВНИЙ ЦИКЛ ОНОВЛЕННЯ СЦЕНИ ---
+        // --- РЕНДЕР-ЦИКЛ (З ПРИВ'ЯЗКОЮ ДО РЕАЛЬНОГО ЧАСУ) ---
         function animate() {
             requestAnimationFrame(animate);
 
-            // Якщо джойстик відхилено — рухаємо та повертаємо героя
-            if (moveVector.x !== 0 || moveVector.z !== 0) {
-                playerGroup.position.x += moveVector.x * moveSpeed;
-                playerGroup.position.z += moveVector.z * moveSpeed;
+            // Отримуємо час у секундах з попереднього кадру
+            const delta = clock.getDelta();
 
-                // Розраховуємо кут повороту персонажа за напрямком руху
+            if (moveVector.x !== 0 || moveVector.z !== 0) {
+                // Швидкість множиться на delta — це гарантує плавний рух незалежно від FPS
+                const moveStep = baseSpeed * delta;
+                playerGroup.position.x += moveVector.x * moveStep;
+                playerGroup.position.z += moveVector.z * moveStep;
+
                 const angle = Math.atan2(moveVector.x, moveVector.z);
                 playerGroup.rotation.y = angle;
             }
 
-            // Камера плавно слідує за позицією персонажа
+            // Плавне слідування камери
             camera.position.x = playerGroup.position.x;
             camera.position.z = playerGroup.position.z + 18;
 
-            bankRoof.rotation.y += 0.005;
+            bankRoof.rotation.y += 0.5 * delta;
 
             renderer.render(scene, camera);
         }
