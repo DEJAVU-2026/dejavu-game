@@ -27,7 +27,7 @@
             display: block;
         }
 
-        /* --- ПАНЕЛЬ ВИБОРУ ДРЕВНІХ РАС --- */
+        /* --- ПАНЕЛЬ ВИБОРУ РАС --- */
         .race-selector {
             position: absolute;
             top: 12px;
@@ -55,10 +55,10 @@
             transition: all 0.2s;
         }
         .btn-race.active {
-            background: rgba(139, 0, 0, 0.4);
+            background: rgba(139, 0, 0, 0.5);
             border-color: #ff3333;
             color: #fff;
-            box-shadow: 0 0 12px rgba(255, 0, 0, 0.5);
+            box-shadow: 0 0 12px rgba(255, 0, 0, 0.6);
         }
 
         /* --- ВЕРХНІЙ HUD --- */
@@ -179,7 +179,7 @@
         <div class="hp-bar-bg"><div class="hp-bar-fill" id="hp-fill"></div></div>
         <div class="stats-row">
             <span>❤️ HP: <strong id="hp-txt">1200</strong></span>
-            <span>⚡ Швидкість: <strong id="speed-txt">11</strong></span>
+            <span>⚡ Швидкість: <strong id="speed-txt">11.5</strong></span>
         </div>
     </div>
 
@@ -204,7 +204,7 @@
 
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x05050a);
-        scene.fog = new THREE.FogExp2(0x05050a, 0.025);
+        scene.fog = new THREE.FogExp2(0x05050a, 0.02);
 
         const clock = new THREE.Clock();
 
@@ -212,11 +212,12 @@
         camera.position.set(0, 18, 18);
         camera.lookAt(0, 0, 0);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+        // Якісне підсвічування всієї арени
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
 
-        const dirLight = new THREE.DirectionalLight(0xff4444, 0.6);
-        dirLight.position.set(10, 20, 10);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(15, 25, 15);
         dirLight.castShadow = true;
         scene.add(dirLight);
 
@@ -233,7 +234,7 @@
         grid.position.y = 0.01;
         scene.add(grid);
 
-        // --- ДРЕВНЯ РУЇНА / ХРАМ У ЦЕНТРІ ---
+        // --- ДРЕВНЯ РУЇНА У ЦЕНТРІ ---
         const templeGroup = new THREE.Group();
         templeGroup.position.set(0, 0, -10);
         const templeBase = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 6), new THREE.MeshStandardMaterial({ color: 0x181824, roughness: 0.8 }));
@@ -248,11 +249,25 @@
         const playerGroup = new THREE.Group();
         scene.add(playerGroup);
 
+        // ДИНАМІЧНЕ СЯЙВО ПІД ГЕРОЄМ (АУРА)
+        const heroLight = new THREE.PointLight(0xff0000, 2, 8);
+        heroLight.position.set(0, 1.5, 0);
+        playerGroup.add(heroLight);
+
+        // Кільце виділення під ногами
+        const auraRing = new THREE.Mesh(
+            new THREE.RingGeometry(0.8, 1.1, 32),
+            new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide })
+        );
+        auraRing.rotation.x = -Math.PI / 2;
+        auraRing.position.y = 0.02;
+        playerGroup.add(auraRing);
+
         let currentRaceModel = null;
-        let baseSpeed = 11;
+        let baseSpeed = 11.5;
         let isFloating = false;
 
-        // --- ГЕНЕРАТОР 3D МОДЕЛЕЙ ДЛЯ 4 ДРЕВНІХ РАС ---
+        // --- ДЕТАЛІЗОВАНІ 3D МОДЕЛІ ДЛЯ 4 ДРЕВНІХ РАС ---
         function buildRaceModel(race) {
             if (currentRaceModel) playerGroup.remove(currentRaceModel);
             
@@ -260,63 +275,175 @@
             isFloating = false;
 
             if (race === 'werewolf') {
-                // Оборотень: дикий рудувато-темний воїн із плечовими шипами
-                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.5, 1.9, 16), new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.7 }));
-                body.position.y = 0.95;
+                // 🐺 ОБОРОТЕНЬ: М'язистий, з мордою, вухами, пазурами та сяючими очима
+                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.4, 1.8, 12), new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.7 }));
+                body.position.y = 0.9;
                 raceGroup.add(body);
 
-                const clawL = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 8), new THREE.MeshStandardMaterial({ color: 0x78350f }));
-                clawL.position.set(-0.6, 1.5, 0.2);
-                clawL.rotation.x = 0.5;
-                raceGroup.add(clawL);
+                // Голова та морда
+                const head = new THREE.Mesh(new THREE.SphereGeometry(0.45, 12, 12), new THREE.MeshStandardMaterial({ color: 0x3a1502 }));
+                head.position.set(0, 1.8, 0.1);
+                raceGroup.add(head);
 
-                const clawR = clawL.clone();
-                clawR.position.x = 0.6;
-                raceGroup.add(clawR);
+                const snout = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.4), new THREE.MeshStandardMaterial({ color: 0x270d01 }));
+                snout.position.set(0, 1.75, 0.4);
+                raceGroup.add(snout);
+
+                // Вуха
+                const earL = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.3, 4), new THREE.MeshStandardMaterial({ color: 0x270d01 }));
+                earL.position.set(-0.25, 2.2, 0);
+                raceGroup.add(earL);
+
+                const earR = earL.clone();
+                earR.position.x = 0.25;
+                raceGroup.add(earR);
+
+                // Сяючі червоно-жовті очі
+                const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+                const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.1), eyeMat);
+                eyeL.position.set(-0.15, 1.85, 0.32);
+                raceGroup.add(eyeL);
+
+                const eyeR = eyeL.clone();
+                eyeR.position.x = 0.15;
+                raceGroup.add(eyeR);
+
+                // Масивні руки з пазурами
+                const armL = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.9, 0.25), new THREE.MeshStandardMaterial({ color: 0x3a1502 }));
+                armL.position.set(-0.55, 1.1, 0.2);
+                armL.rotation.x = 0.4;
+                raceGroup.add(armL);
+
+                const armR = armL.clone();
+                armR.position.x = 0.55;
+                raceGroup.add(armR);
+
+                // Кольори аури
+                heroLight.color.setHex(0xff3300);
+                auraRing.material.color.setHex(0xff3300);
 
                 baseSpeed = 11.5;
                 document.getElementById('race-title').innerText = '🐺 Оборотень';
                 document.getElementById('hp-txt').innerText = '1200';
 
             } else if (race === 'ghost') {
-                // Привид: напівпрозорий бірюзово-білий дух, що левитує
+                // 👻 ПРИВИД: Левитуючий дух у капюшоні, із неоновими очима та плаваючими сферами-руками
                 isFloating = true;
-                const body = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2.2, 16), new THREE.MeshStandardMaterial({ color: 0x2dd4bf, transparent: true, opacity: 0.65, emissive: 0x0d9488 }));
+
+                const body = new THREE.Mesh(
+                    new THREE.ConeGeometry(0.55, 2.2, 16),
+                    new THREE.MeshStandardMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.7, emissive: 0x0891b2 })
+                );
                 body.position.y = 1.1;
                 raceGroup.add(body);
 
-                const core = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 12), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-                core.position.set(0, 1.8, 0);
-                raceGroup.add(core);
+                // Капюшон / Голова
+                const hood = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 16), new THREE.MeshStandardMaterial({ color: 0x0284c7 }));
+                hood.position.set(0, 1.9, 0);
+                raceGroup.add(hood);
 
-                baseSpeed = 13.5; // Найшвидший
+                // Сяючі неоново-білі очі
+                const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), eyeMat);
+                eyeL.position.set(-0.12, 1.95, 0.32);
+                raceGroup.add(eyeL);
+
+                const eyeR = eyeL.clone();
+                eyeR.position.x = 0.12;
+                raceGroup.add(eyeR);
+
+                // Плаваючі магічні сфери замість рук
+                const handL = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), new THREE.MeshBasicMaterial({ color: 0x67e8f9 }));
+                handL.position.set(-0.6, 1.3, 0.2);
+                raceGroup.add(handL);
+
+                const handR = handL.clone();
+                handR.position.x = 0.6;
+                raceGroup.add(handR);
+
+                heroLight.color.setHex(0x00ffff);
+                auraRing.material.color.setHex(0x00ffff);
+
+                baseSpeed = 13.5;
                 document.getElementById('race-title').innerText = '👻 Привид';
                 document.getElementById('hp-txt').innerText = '800';
 
             } else if (race === 'cadaver') {
-                // Кадавр: масивна похмура нежить фіолетового відтінку
-                const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.8, 0.7), new THREE.MeshStandardMaterial({ color: 0x3b2b46, roughness: 0.9 }));
-                body.position.y = 0.9;
+                // 🧟 КАДАВР: Велетенський квадратний монстр, з залізними болтами та важким кулаком
+                const body = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.7, 0.8), new THREE.MeshStandardMaterial({ color: 0x2e2338, roughness: 0.9 }));
+                body.position.y = 0.85;
                 raceGroup.add(body);
 
-                const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.6), new THREE.MeshStandardMaterial({ color: 0x4a3b5c }));
-                head.position.set(0, 1.9, 0);
+                // Квадратна голова
+                const head = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.6, 0.65), new THREE.MeshStandardMaterial({ color: 0x3d304a }));
+                head.position.set(0, 1.8, 0);
                 raceGroup.add(head);
 
-                baseSpeed = 9.0; // Повільний та витривалий
+                // Болти на шиї
+                const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.9, 8), new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9 }));
+                bolt.rotation.z = Math.PI / 2;
+                bolt.position.set(0, 1.5, 0);
+                raceGroup.add(bolt);
+
+                // Токсично-зелені сяючі очі
+                const eyeMat = new THREE.MeshBasicMaterial({ color: 0x22c55e });
+                const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.1), eyeMat);
+                eyeL.position.set(-0.15, 1.85, 0.31);
+                raceGroup.add(eyeL);
+
+                const eyeR = eyeL.clone();
+                eyeR.position.x = 0.15;
+                raceGroup.add(eyeR);
+
+                // Гігантські масивні кулаки
+                const fistL = new THREE.Mesh(new THREE.BoxGeometry(0.35, 1.0, 0.35), new THREE.MeshStandardMaterial({ color: 0x1e1726 }));
+                fistL.position.set(-0.7, 0.8, 0.1);
+                raceGroup.add(fistL);
+
+                const fistR = fistL.clone();
+                fistR.position.x = 0.7;
+                raceGroup.add(fistR);
+
+                heroLight.color.setHex(0x22c55e);
+                auraRing.material.color.setHex(0x22c55e);
+
+                baseSpeed = 9.0;
                 document.getElementById('race-title').innerText = '🧟 Кадавр';
                 document.getElementById('hp-txt').innerText = '1500';
 
             } else if (race === 'vampire') {
-                // Вампір: елегантний чорно-червоний аристократ ночі
-                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 2.0, 16), new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.3 }));
-                body.position.y = 1.0;
+                // 🧛 ВАМПІР: Витончений готичний граф, високий комір, біле обличчя, рубінові очі та кривава сфера
+                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 1.9, 16), new THREE.MeshStandardMaterial({ color: 0x111115, roughness: 0.3 }));
+                body.position.y = 0.95;
                 raceGroup.add(body);
 
-                const cape = new THREE.Mesh(new THREE.ConeGeometry(0.7, 1.8, 4), new THREE.MeshStandardMaterial({ color: 0x991b1b }));
-                cape.position.set(0, 1.0, -0.2);
-                cape.rotation.y = Math.PI / 4;
-                raceGroup.add(cape);
+                // Голова з блідою шкірою
+                const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 12), new THREE.MeshStandardMaterial({ color: 0xe2e8f0 }));
+                head.position.set(0, 1.85, 0);
+                raceGroup.add(head);
+
+                // Високий багряний комір
+                const collar = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.1), new THREE.MeshStandardMaterial({ color: 0x991b1b }));
+                collar.position.set(0, 1.8, -0.25);
+                raceGroup.add(collar);
+
+                // Сяючі рубіново-червоні очі
+                const eyeMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+                const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), eyeMat);
+                eyeL.position.set(-0.11, 1.88, 0.3);
+                raceGroup.add(eyeL);
+
+                const eyeR = eyeL.clone();
+                eyeR.position.x = 0.11;
+                raceGroup.add(eyeR);
+
+                // Рубінова плаваюча сфера крові в руці
+                const bloodOrb = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), new THREE.MeshBasicMaterial({ color: 0xdc2626 }));
+                bloodOrb.position.set(0.5, 1.3, 0.3);
+                raceGroup.add(bloodOrb);
+
+                heroLight.color.setHex(0xdc2626);
+                auraRing.material.color.setHex(0xdc2626);
 
                 baseSpeed = 12.0;
                 document.getElementById('race-title').innerText = '🧛 Вампір';
@@ -378,46 +505,4 @@
 
         joyZone.addEventListener('mousedown', handleStart);
         window.addEventListener('mousemove', handleMove);
-        window.addEventListener('mouseup', handleEnd);
-
-        function triggerAttack() { console.log("⚔️ Темна атака!"); }
-        function triggerSkill() { console.log("⚡ Магічний скілл!"); }
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        // --- РЕНДЕР ЦИКЛ ---
-        let timeTracker = 0;
-        function animate() {
-            requestAnimationFrame(animate);
-            const delta = clock.getDelta();
-            timeTracker += delta;
-
-            if (moveVector.x !== 0 || moveVector.z !== 0) {
-                const moveStep = baseSpeed * delta;
-                playerGroup.position.x += moveVector.x * moveStep;
-                playerGroup.position.z += moveVector.z * moveStep;
-
-                const angle = Math.atan2(moveVector.x, moveVector.z);
-                playerGroup.rotation.y = angle;
-            }
-
-            // Ефект левітації для привиде
-            if (isFloating) {
-                playerGroup.position.y = Math.sin(timeTracker * 5) * 0.25;
-            } else {
-                playerGroup.position.y = 0;
-            }
-
-            camera.position.x = playerGroup.position.x;
-            camera.position.z = playerGroup.position.z + 18;
-
-            renderer.render(scene, camera);
-        }
-        animate();
-    </script>
-</body>
-</html>
+        window.addEventListener('mouseup', handle
