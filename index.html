@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>DEJAVU 3D - Character Creation</title>
+    <title>DEJAVU 3D</title>
     <style>
         body { margin: 0; overflow: hidden; background: #05050a; font-family: sans-serif; user-select: none; }
         #canvas-container { width: 100vw; height: 100vh; display: block; }
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         .interactive { pointer-events: auto; }
         
-        /* Character Creation Screens */
         .selection-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(5, 5, 12, 0.95); display: flex; flex-direction: column;
@@ -30,7 +29,6 @@
         }
         .btn-option:active { background: #8b5cf6; transform: scale(0.95); }
 
-        /* HUD & MINIMAP UI */
         #hud { display: none; width: 100%; height: 100%; position: relative; }
         
         #minimap-container {
@@ -73,7 +71,7 @@
 <body>
     <div id="canvas-container"></div>
     <div id="ui-layer">
-        <!-- 1. GENDER SELECTION -->
+        <!-- Gender Select -->
         <div id="gender-select" class="selection-screen interactive">
             <h1>Обери стать героя</h1>
             <div class="gender-grid">
@@ -82,7 +80,7 @@
             </div>
         </div>
 
-        <!-- 2. RACE SELECTION -->
+        <!-- Race Select -->
         <div id="race-select" class="selection-screen interactive" style="display: none;">
             <h1>Обери расу</h1>
             <div class="race-grid">
@@ -114,6 +112,8 @@
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
         let scene, camera, renderer, composer, playerGroup, playerLight;
+        let loadedHeroMesh = null;
+        let mixer, actions = {}, currentAction;
         let selectedGender = 'MALE';
         let currentRace = null;
         let moveVector = new THREE.Vector3();
@@ -124,11 +124,17 @@
         let mapCanvas, mapCtx;
         let enemies = [], torchLights = [];
 
+        // High Quality 3D Humanoid Models (Xbot for Male, Ybot for Female)
+        const MODELS = {
+            MALE: 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Xbot.glb',
+            FEMALE: 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Ybot.glb'
+        };
+
         const RACES = {
-            WEREWOLF: { name: 'Werewolf', ukr: 'Вовкулака', color: 0xa855f7, isGhost: false, speed: 12, cooldown: 4000, abilityName: 'Pounce' },
-            VAMPIRE: { name: 'Vampire', ukr: 'Вампір', color: 0xef4444, isGhost: false, speed: 10.5, cooldown: 5000, abilityName: 'Siphon' },
-            CADAVER: { name: 'Cadaver', ukr: 'Кадавр', color: 0x22c55e, isGhost: false, speed: 9, cooldown: 8000, abilityName: 'Slam' },
-            GHOST: { name: 'Ghost', ukr: 'Привид', color: 0x06b6d4, isGhost: true, speed: 13, cooldown: 6000, abilityName: 'Phase' }
+            WEREWOLF: { name: 'Werewolf', ukr: 'Вовкулака', color: 0xa855f7, scale: 0.018, isGhost: false, speed: 12, cooldown: 4000, abilityName: 'Pounce' },
+            VAMPIRE: { name: 'Vampire', ukr: 'Вампір', color: 0xef4444, scale: 0.015, isGhost: false, speed: 10.5, cooldown: 5000, abilityName: 'Siphon' },
+            CADAVER: { name: 'Cadaver', ukr: 'Кадавр', color: 0x22c55e, scale: 0.016, isGhost: false, speed: 9, cooldown: 8000, abilityName: 'Slam' },
+            GHOST: { name: 'Ghost', ukr: 'Привид', color: 0x06b6d4, scale: 0.014, isGhost: true, speed: 13, cooldown: 6000, abilityName: 'Phase' }
         };
 
         function initScene() {
@@ -227,60 +233,75 @@
             }
         }
 
-        // Build Stylized Humanoid Hero Body
-        function createHumanoidHero() {
-            // Remove old character model if exists
-            while(playerGroup.children.length > 1) { 
-                playerGroup.remove(playerGroup.children[1]); 
+        function loadSelectedHero3DModel() {
+            if (loadedHeroMesh) {
+                playerGroup.remove(loadedHeroMesh);
             }
 
-            const heroMeshGroup = new THREE.Group();
-            const raceColor = currentRace.color;
-            const isFemale = selectedGender === 'FEMALE';
+            const loader = new GLTFLoader();
+            const modelUrl = MODELS[selectedGender];
 
-            // Humanoid Body Proportions
-            const torsoWidth = isFemale ? 0.6 : 0.8;
-            const torsoHeight = isFemale ? 1.4 : 1.6;
-            const headSize = isFemale ? 0.38 : 0.42;
+            loader.load(modelUrl, (gltf) => {
+                loadedHeroMesh = gltf.scene;
+                
+                // Scale & facing direction
+                const s = currentRace.scale;
+                loadedHeroMesh.scale.set(s, s, s);
+                loadedHeroMesh.rotation.y = Math.PI;
 
-            const bodyMat = new THREE.MeshStandardMaterial({ 
-                color: raceColor, 
-                roughness: 0.3, 
-                metalness: 0.2,
-                transparent: currentRace.isGhost,
-                opacity: currentRace.isGhost ? 0.6 : 1.0
+                // Material styling based on race
+                loadedHeroMesh.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        
+                        if (child.material) {
+                            child.material = child.material.clone();
+                            child.material.color.setHex(currentRace.color);
+                            
+                            if (currentRace.isGhost) {
+                                child.material.transparent = true;
+                                child.material.opacity = 0.5;
+                            } else {
+                                child.material.transparent = false;
+                                child.material.opacity = 1.0;
+                            }
+                        }
+                    }
+                });
+
+                // Animations
+                mixer = new THREE.AnimationMixer(loadedHeroMesh);
+                gltf.animations.forEach((clip) => {
+                    actions[clip.name] = mixer.clipAction(clip);
+                });
+
+                if (actions['idle'] || actions['Idle'] || actions['run']) {
+                    const idleAction = actions['idle'] || actions['Idle'] || actions[Object.keys(actions)[0]];
+                    if (idleAction) {
+                        idleAction.play();
+                        currentAction = idleAction;
+                    }
+                }
+
+                if (currentRace.isGhost) {
+                    loadedHeroMesh.position.y = 0.6;
+                } else {
+                    loadedHeroMesh.position.y = 0;
+                }
+
+                playerGroup.add(loadedHeroMesh);
+                playerLight.color.setHex(currentRace.color);
             });
+        }
 
-            // Torso (Human Body)
-            const torsoGeo = new THREE.CylinderGeometry(torsoWidth * 0.8, torsoWidth * 0.6, torsoHeight, 16);
-            const torso = new THREE.Mesh(torsoGeo, bodyMat);
-            torso.position.y = torsoHeight / 2 + 0.6;
-            torso.castShadow = true;
-            heroMeshGroup.add(torso);
-
-            // Head
-            const headGeo = new THREE.SphereGeometry(headSize, 16, 16);
-            const head = new THREE.Mesh(headGeo, bodyMat);
-            head.position.y = torso.position.y + torsoHeight / 2 + headSize * 0.8;
-            heroMeshGroup.add(head);
-
-            // Glowing Eyes (Humanoid Face Accent)
-            const eyeGeo = new THREE.SphereGeometry(0.08, 8, 8);
-            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-            const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-            leftEye.position.set(-0.12, head.position.y + 0.05, 0.32);
-            const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-            rightEye.position.set(0.12, head.position.y + 0.05, 0.32);
-            heroMeshGroup.add(leftEye);
-            heroMeshGroup.add(rightEye);
-
-            // Floating Ghost Offset
-            if (currentRace.isGhost) {
-                heroMeshGroup.position.y = 0.5;
-            }
-
-            playerGroup.add(heroMeshGroup);
-            playerLight.color.setHex(raceColor);
+        function setAnimation(name) {
+            if (!mixer) return;
+            const targetAction = actions[name] || actions[name.toLowerCase()] || actions[name.toUpperCase()];
+            if (!targetAction || currentAction === targetAction) return;
+            if (currentAction) currentAction.fadeOut(0.2);
+            targetAction.reset().fadeIn(0.2).play();
+            currentAction = targetAction;
         }
 
         window.chooseGender = function(gender) {
@@ -291,7 +312,7 @@
 
         window.selectRace = function(raceKey) {
             currentRace = RACES[raceKey];
-            createHumanoidHero();
+            loadSelectedHero3DModel();
 
             document.getElementById('race-select').style.display = 'none';
             document.getElementById('hud').style.display = 'block';
@@ -403,17 +424,23 @@
             requestAnimationFrame(animate);
             const delta = clock.getDelta();
 
+            if (mixer) mixer.update(delta);
+
             if (currentRace) {
-                if (currentRace.isGhost && playerGroup.children[1]) {
-                    playerGroup.children[1].position.y = 0.5 + Math.sin(Date.now() * 0.005) * 0.15;
+                if (currentRace.isGhost && loadedHeroMesh) {
+                    loadedHeroMesh.position.y = 0.6 + Math.sin(Date.now() * 0.005) * 0.12;
                 }
 
                 if (isPouncing) {
                     playerGroup.position.addScaledVector(pounceDirection, pounceSpeed * delta);
+                    setAnimation('run');
                 } else if (moveVector.lengthSq() > 0.01) {
                     playerGroup.position.x += moveVector.x * currentRace.speed * delta;
                     playerGroup.position.z += moveVector.z * currentRace.speed * delta;
                     playerGroup.rotation.y = Math.atan2(moveVector.x, moveVector.z);
+                    setAnimation('run');
+                } else {
+                    setAnimation('idle');
                 }
                 camera.position.x = playerGroup.position.x;
                 camera.position.z = playerGroup.position.z + 12;
