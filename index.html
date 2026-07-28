@@ -3,27 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>DEJAVU 3D</title>
+    <title>DEJAVU 3D - Character Creation</title>
     <style>
         body { margin: 0; overflow: hidden; background: #05050a; font-family: sans-serif; user-select: none; }
         #canvas-container { width: 100vw; height: 100vh; display: block; }
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         .interactive { pointer-events: auto; }
         
-        /* Race Select Screen */
-        #race-select {
+        /* Character Creation Screens */
+        .selection-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(5, 5, 10, 0.94); display: flex; flex-direction: column;
+            background: rgba(5, 5, 12, 0.95); display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 100;
+            backdrop-filter: blur(10px);
         }
-        #race-select h1 { color: #f8fafc; font-size: 26px; letter-spacing: 3px; margin-bottom: 25px; text-shadow: 0 0 15px #8b5cf6; }
+        .selection-screen h1 { color: #f8fafc; font-size: 24px; letter-spacing: 3px; margin-bottom: 25px; text-shadow: 0 0 15px #8b5cf6; text-transform: uppercase; }
+        
+        .gender-grid { display: flex; gap: 20px; width: 85%; max-width: 320px; }
         .race-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 85%; max-width: 320px; }
-        .race-btn {
-            background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.6);
-            color: #fff; padding: 18px 10px; text-align: center; font-weight: bold;
-            border-radius: 12px; cursor: pointer; text-transform: uppercase; font-size: 13px;
+        
+        .btn-option {
+            flex: 1; background: rgba(139, 92, 246, 0.15); border: 2px solid rgba(139, 92, 246, 0.6);
+            color: #fff; padding: 20px 10px; text-align: center; font-weight: bold;
+            border-radius: 14px; cursor: pointer; text-transform: uppercase; font-size: 14px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); transition: all 0.2s;
         }
-        .race-btn:active { background: #8b5cf6; transform: scale(0.95); }
+        .btn-option:active { background: #8b5cf6; transform: scale(0.95); }
 
         /* HUD & MINIMAP UI */
         #hud { display: none; width: 100%; height: 100%; position: relative; }
@@ -35,6 +40,13 @@
             box-shadow: 0 0 15px rgba(0,0,0,0.8), 0 0 10px rgba(139, 92, 246, 0.4);
         }
         #minimap { width: 100%; height: 100%; }
+
+        #hero-info {
+            position: absolute; top: 20px; left: 20px; color: #fff;
+            font-weight: bold; font-size: 14px; text-shadow: 0 0 10px #8b5cf6;
+            background: rgba(5,5,12,0.6); padding: 8px 14px; border-radius: 10px;
+            border: 1px solid rgba(139, 92, 246, 0.4);
+        }
 
         #ability-btn {
             position: absolute; bottom: 35px; right: 35px; width: 85px; height: 85px;
@@ -61,16 +73,29 @@
 <body>
     <div id="canvas-container"></div>
     <div id="ui-layer">
-        <div id="race-select" class="interactive">
-            <h1>SELECT YOUR RACE</h1>
-            <div class="race-grid">
-                <div class="race-btn" onclick="selectRace('WEREWOLF')">Werewolf</div>
-                <div class="race-btn" onclick="selectRace('VAMPIRE')">Vampire</div>
-                <div class="race-btn" onclick="selectRace('CADAVER')">Cadaver</div>
-                <div class="race-btn" onclick="selectRace('GHOST')">Ghost</div>
+        <!-- 1. GENDER SELECTION -->
+        <div id="gender-select" class="selection-screen interactive">
+            <h1>Обери стать героя</h1>
+            <div class="gender-grid">
+                <div class="btn-option" onclick="chooseGender('MALE')">Чоловік ♂</div>
+                <div class="btn-option" onclick="chooseGender('FEMALE')">Жінка ♀</div>
             </div>
         </div>
+
+        <!-- 2. RACE SELECTION -->
+        <div id="race-select" class="selection-screen interactive" style="display: none;">
+            <h1>Обери расу</h1>
+            <div class="race-grid">
+                <div class="btn-option" onclick="selectRace('WEREWOLF')">Вовкулака</div>
+                <div class="btn-option" onclick="selectRace('VAMPIRE')">Вампір</div>
+                <div class="btn-option" onclick="selectRace('CADAVER')">Кадавр</div>
+                <div class="btn-option" onclick="selectRace('GHOST')">Привид</div>
+            </div>
+        </div>
+
+        <!-- HUD -->
         <div id="hud">
+            <div id="hero-info"><span id="hero-title">HERO</span></div>
             <div id="minimap-container">
                 <canvas id="minimap" width="110" height="110"></canvas>
             </div>
@@ -88,9 +113,8 @@
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-        let scene, camera, renderer, composer, playerGroup, loadedCharacterMesh, playerLight;
-        let mixer, actions = {}, currentAction;
-        let torchLights = [], enemies = [];
+        let scene, camera, renderer, composer, playerGroup, playerLight;
+        let selectedGender = 'MALE';
         let currentRace = null;
         let moveVector = new THREE.Vector3();
         let isPouncing = false, pounceDirection = new THREE.Vector3(), pounceSpeed = 32;
@@ -98,12 +122,13 @@
         const clock = new THREE.Clock();
 
         let mapCanvas, mapCtx;
+        let enemies = [], torchLights = [];
 
         const RACES = {
-            WEREWOLF: { name: 'Werewolf', color: 0xc084fc, speed: 11, cooldown: 4000, abilityName: 'Pounce' },
-            VAMPIRE: { name: 'Vampire', color: 0xf87171, speed: 10, cooldown: 5000, abilityName: 'Siphon' },
-            CADAVER: { name: 'Cadaver', color: 0x4ade80, speed: 8.5, cooldown: 8000, abilityName: 'Slam' },
-            GHOST: { name: 'Ghost', color: 0x38bdf8, speed: 12.5, cooldown: 6000, abilityName: 'Phase' }
+            WEREWOLF: { name: 'Werewolf', ukr: 'Вовкулака', color: 0xa855f7, isGhost: false, speed: 12, cooldown: 4000, abilityName: 'Pounce' },
+            VAMPIRE: { name: 'Vampire', ukr: 'Вампір', color: 0xef4444, isGhost: false, speed: 10.5, cooldown: 5000, abilityName: 'Siphon' },
+            CADAVER: { name: 'Cadaver', ukr: 'Кадавр', color: 0x22c55e, isGhost: false, speed: 9, cooldown: 8000, abilityName: 'Slam' },
+            GHOST: { name: 'Ghost', ukr: 'Привид', color: 0x06b6d4, isGhost: true, speed: 13, cooldown: 6000, abilityName: 'Phase' }
         };
 
         function initScene() {
@@ -119,28 +144,20 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.shadowMap.enabled = true;
-            
-            // ACESFilmic Tone Mapping for vibrant Unreal-engine look
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
             renderer.toneMappingExposure = 1.3;
             container.appendChild(renderer.domElement);
 
-            // Post-Processing Bloom
             const renderScene = new RenderPass(scene, camera);
-            const bloomPass = new UnrealBloomPass(
-                new THREE.Vector2(window.innerWidth, window.innerHeight),
-                0.4, 0.4, 0.85
-            );
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.4, 0.4, 0.85);
 
             composer = new EffectComposer(renderer);
             composer.addPass(renderScene);
             composer.addPass(bloomPass);
 
-            // 1. Hemisphere Light (Sky & Ground Soft Fill)
             const hemiLight = new THREE.HemisphereLight(0xa5b4fc, 0x311b92, 1.4);
             scene.add(hemiLight);
 
-            // 2. Main Directional Light (Sun/Moon)
             const dirLight = new THREE.DirectionalLight(0xffffff, 1.8);
             dirLight.position.set(15, 25, 10);
             dirLight.castShadow = true;
@@ -155,12 +172,9 @@
             playerGroup = new THREE.Group();
             scene.add(playerGroup);
 
-            // 3. Player Light Aura (Moves with player)
-            playerLight = new THREE.PointLight(0xa855f7, 3.5, 14);
+            playerLight = new THREE.PointLight(0xa855f7, 4, 15);
             playerLight.position.set(0, 2.5, 0);
             playerGroup.add(playerLight);
-
-            loadCharacterModel();
 
             window.addEventListener('resize', onWindowResize);
             setupJoystick();
@@ -168,7 +182,6 @@
         }
 
         function buildDungeonArena() {
-            // Floor with subtle reflectivity
             const floorGeo = new THREE.PlaneGeometry(60, 60);
             const floorMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.2 });
             const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -180,7 +193,6 @@
             grid.position.y = 0.01;
             scene.add(grid);
 
-            // Pillars
             const colGeo = new THREE.BoxGeometry(2.2, 9, 2.2);
             const colMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 });
             
@@ -195,23 +207,15 @@
                 col.castShadow = true;
                 scene.add(col);
 
-                // Torch Light
                 const torchLight = new THREE.PointLight(0xf59e0b, 2.5, 14);
                 torchLight.position.set(pos[0], 5.5, pos[2]);
                 scene.add(torchLight);
                 torchLights.push(torchLight);
             });
-
-            // Portal Arch
-            const portalGeo = new THREE.TorusGeometry(2.5, 0.25, 16, 32);
-            const portalMat = new THREE.MeshStandardMaterial({ color: 0xa855f7, emissive: 0x7c3aed, emissiveIntensity: 0.8 });
-            const portal = new THREE.Mesh(portalGeo, portalMat);
-            portal.position.set(0, 2.8, -25);
-            scene.add(portal);
         }
 
         function spawnEnemies() {
-            const enemyMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3, metalness: 0.2 });
+            const enemyMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3 });
             const enemyGeo = new THREE.CylinderGeometry(0.75, 0.75, 2, 16);
 
             for (let i = 0; i < 3; i++) {
@@ -219,64 +223,82 @@
                 enemy.position.set((i - 1) * 9, 1, -8);
                 enemy.castShadow = true;
                 scene.add(enemy);
-
-                // Red light on enemies
-                const eLight = new THREE.PointLight(0xef4444, 1.5, 5);
-                eLight.position.set(0, 1.2, 0);
-                enemy.add(eLight);
-
                 enemies.push(enemy);
             }
         }
 
-        function loadCharacterModel() {
-            const loader = new GLTFLoader();
-            const modelUrl = 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Soldier.glb';
+        // Build Stylized Humanoid Hero Body
+        function createHumanoidHero() {
+            // Remove old character model if exists
+            while(playerGroup.children.length > 1) { 
+                playerGroup.remove(playerGroup.children[1]); 
+            }
 
-            loader.load(modelUrl, (gltf) => {
-                loadedCharacterMesh = gltf.scene;
-                loadedCharacterMesh.scale.set(1.4, 1.4, 1.4);
-                loadedCharacterMesh.rotation.y = Math.PI;
+            const heroMeshGroup = new THREE.Group();
+            const raceColor = currentRace.color;
+            const isFemale = selectedGender === 'FEMALE';
 
-                loadedCharacterMesh.traverse((child) => {
-                    if (child.isMesh) {
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                    }
-                });
+            // Humanoid Body Proportions
+            const torsoWidth = isFemale ? 0.6 : 0.8;
+            const torsoHeight = isFemale ? 1.4 : 1.6;
+            const headSize = isFemale ? 0.38 : 0.42;
 
-                mixer = new THREE.AnimationMixer(loadedCharacterMesh);
-                gltf.animations.forEach((clip) => {
-                    actions[clip.name] = mixer.clipAction(clip);
-                });
-
-                if (actions['Idle']) {
-                    actions['Idle'].play();
-                    currentAction = actions['Idle'];
-                }
-
-                playerGroup.add(loadedCharacterMesh);
+            const bodyMat = new THREE.MeshStandardMaterial({ 
+                color: raceColor, 
+                roughness: 0.3, 
+                metalness: 0.2,
+                transparent: currentRace.isGhost,
+                opacity: currentRace.isGhost ? 0.6 : 1.0
             });
+
+            // Torso (Human Body)
+            const torsoGeo = new THREE.CylinderGeometry(torsoWidth * 0.8, torsoWidth * 0.6, torsoHeight, 16);
+            const torso = new THREE.Mesh(torsoGeo, bodyMat);
+            torso.position.y = torsoHeight / 2 + 0.6;
+            torso.castShadow = true;
+            heroMeshGroup.add(torso);
+
+            // Head
+            const headGeo = new THREE.SphereGeometry(headSize, 16, 16);
+            const head = new THREE.Mesh(headGeo, bodyMat);
+            head.position.y = torso.position.y + torsoHeight / 2 + headSize * 0.8;
+            heroMeshGroup.add(head);
+
+            // Glowing Eyes (Humanoid Face Accent)
+            const eyeGeo = new THREE.SphereGeometry(0.08, 8, 8);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+            leftEye.position.set(-0.12, head.position.y + 0.05, 0.32);
+            const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+            rightEye.position.set(0.12, head.position.y + 0.05, 0.32);
+            heroMeshGroup.add(leftEye);
+            heroMeshGroup.add(rightEye);
+
+            // Floating Ghost Offset
+            if (currentRace.isGhost) {
+                heroMeshGroup.position.y = 0.5;
+            }
+
+            playerGroup.add(heroMeshGroup);
+            playerLight.color.setHex(raceColor);
         }
 
-        function setAnimation(name) {
-            if (!mixer || !actions[name] || currentAction === actions[name]) return;
-            if (currentAction) currentAction.fadeOut(0.2);
-            actions[name].reset().fadeIn(0.2).play();
-            currentAction = actions[name];
-        }
+        window.chooseGender = function(gender) {
+            selectedGender = gender;
+            document.getElementById('gender-select').style.display = 'none';
+            document.getElementById('race-select').style.display = 'flex';
+        };
 
         window.selectRace = function(raceKey) {
             currentRace = RACES[raceKey];
-            
-            // Set Player Aura color according to race
-            if (playerLight) {
-                playerLight.color.setHex(currentRace.color);
-            }
+            createHumanoidHero();
 
             document.getElementById('race-select').style.display = 'none';
             document.getElementById('hud').style.display = 'block';
             document.getElementById('ability-btn').innerText = currentRace.abilityName;
+            
+            const genderTag = selectedGender === 'MALE' ? 'Чоловік' : 'Жінка';
+            document.getElementById('hero-title').innerText = `${currentRace.ukr} (${genderTag})`;
         };
 
         window.triggerAbility = function() {
@@ -359,7 +381,6 @@
 
             mapCtx.clearRect(0, 0, size, size);
 
-            // Player dot
             const px = center + playerGroup.position.x * scale;
             const py = center + playerGroup.position.z * scale;
 
@@ -368,7 +389,6 @@
             mapCtx.arc(px, py, 4, 0, Math.PI * 2);
             mapCtx.fill();
 
-            // Enemy dots
             mapCtx.fillStyle = '#ef4444';
             enemies.forEach(e => {
                 const ex = center + e.position.x * scale;
@@ -383,19 +403,17 @@
             requestAnimationFrame(animate);
             const delta = clock.getDelta();
 
-            if (mixer) mixer.update(delta);
-
             if (currentRace) {
+                if (currentRace.isGhost && playerGroup.children[1]) {
+                    playerGroup.children[1].position.y = 0.5 + Math.sin(Date.now() * 0.005) * 0.15;
+                }
+
                 if (isPouncing) {
                     playerGroup.position.addScaledVector(pounceDirection, pounceSpeed * delta);
-                    setAnimation('Run');
                 } else if (moveVector.lengthSq() > 0.01) {
                     playerGroup.position.x += moveVector.x * currentRace.speed * delta;
                     playerGroup.position.z += moveVector.z * currentRace.speed * delta;
                     playerGroup.rotation.y = Math.atan2(moveVector.x, moveVector.z);
-                    setAnimation('Run');
-                } else {
-                    setAnimation('Idle');
                 }
                 camera.position.x = playerGroup.position.x;
                 camera.position.z = playerGroup.position.z + 12;
