@@ -3,43 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>DEJAVU 3D</title>
+    <title>DEJAVU 3D - GLTF Models</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #0b0d17; font-family: sans-serif; user-select: none; }
+        body { margin: 0; overflow: hidden; background: #070913; font-family: sans-serif; user-select: none; }
         #canvas-container { width: 100vw; height: 100vh; display: block; }
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         .interactive { pointer-events: auto; }
         
-        /* Race Selection UI */
+        /* Race Select Screen */
         #race-select {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(11, 13, 23, 0.95); display: flex; flex-direction: column;
+            background: rgba(7, 9, 19, 0.94); display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 100;
         }
-        #race-select h1 { color: #f8fafc; font-size: 28px; letter-spacing: 3px; margin-bottom: 25px; text-shadow: 0 0 12px #8b5cf6; }
+        #race-select h1 { color: #f8fafc; font-size: 26px; letter-spacing: 3px; margin-bottom: 20px; text-shadow: 0 0 15px #8b5cf6; }
         .race-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 85%; max-width: 320px; }
         .race-btn {
-            background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(139, 92, 246, 0.4);
-            color: #f8fafc; padding: 18px 10px; text-align: center; font-weight: bold;
-            border-radius: 12px; cursor: pointer; text-transform: uppercase; font-size: 14px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(139, 92, 246, 0.5);
+            color: #fff; padding: 16px 10px; text-align: center; font-weight: bold;
+            border-radius: 12px; cursor: pointer; text-transform: uppercase; font-size: 13px;
         }
-        .race-btn:active { background: #8b5cf6; transform: scale(0.96); }
+        .race-btn:active { background: #8b5cf6; transform: scale(0.95); }
 
         /* HUD UI */
         #hud { display: none; width: 100%; height: 100%; position: relative; }
         #ability-btn {
-            position: absolute; bottom: 40px; right: 40px; width: 80px; height: 80px;
-            background: radial-gradient(circle, #8b5cf6 0%, #6d28d9 100%);
+            position: absolute; bottom: 35px; right: 35px; width: 80px; height: 80px;
+            background: radial-gradient(circle, #8b5cf6 0%, #4c1d95 100%);
             border: 2px solid #ddd6fe; border-radius: 50%; color: white; font-weight: bold;
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 0 20px rgba(139, 92, 246, 0.7); font-size: 13px; text-align: center;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.6); font-size: 13px; text-align: center;
         }
         #ability-btn:active { transform: scale(0.92); }
 
-        #joystick-zone { position: absolute; bottom: 40px; left: 40px; width: 120px; height: 120px; border: 2px dashed rgba(255,255,255,0.2); border-radius: 50%; }
-        #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: rgba(255,255,255,0.4); border-radius: 50%; box-shadow: 0 0 10px rgba(255,255,255,0.3); }
+        #joystick-zone { position: absolute; bottom: 35px; left: 35px; width: 120px; height: 120px; border: 2px dashed rgba(255,255,255,0.2); border-radius: 50%; }
+        #joystick-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: rgba(255,255,255,0.4); border-radius: 50%; }
     </style>
+
+    <!-- Three.js Module Importmap -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
 </head>
 <body>
     <div id="canvas-container"></div>
@@ -61,9 +70,11 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script>
-        let scene, camera, renderer, playerGroup, playerBodyMat, torchLights = [];
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        let scene, camera, renderer, playerGroup, loadedCharacterMesh;
         let currentRace = null;
         let moveVector = new THREE.Vector3();
         let isPouncing = false, pounceDirection = new THREE.Vector3(), pounceSpeed = 30;
@@ -79,11 +90,11 @@
         function initScene() {
             const container = document.getElementById('canvas-container');
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0a0c16);
-            scene.fog = new THREE.FogExp2(0x0a0c16, 0.035);
+            scene.background = new THREE.Color(0x070913);
+            scene.fog = new THREE.FogExp2(0x070913, 0.03);
 
             camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 16, 13);
+            camera.position.set(0, 15, 12);
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -91,104 +102,77 @@
             renderer.shadowMap.enabled = true;
             container.appendChild(renderer.domElement);
 
-            // Lighting setup
-            const ambient = new THREE.AmbientLight(0x3b82f6, 0.4);
+            // Light
+            const ambient = new THREE.AmbientLight(0x60a5fa, 0.6);
             scene.add(ambient);
 
-            const dirLight = new THREE.DirectionalLight(0xa78bfa, 0.8);
-            dirLight.position.set(15, 25, 10);
+            const dirLight = new THREE.DirectionalLight(0xc084fc, 1.2);
+            dirLight.position.set(12, 20, 10);
             dirLight.castShadow = true;
             scene.add(dirLight);
 
-            buildTavernEnvironment();
-            createPlayerModel();
+            // Ground Arena
+            const floorGeo = new THREE.PlaneGeometry(60, 60);
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.8 });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            const grid = new THREE.GridHelper(60, 30, 0x8b5cf6, 0x1f2937);
+            grid.position.y = 0.01;
+            scene.add(grid);
+
+            // Container for player
+            playerGroup = new THREE.Group();
+            scene.add(playerGroup);
+
+            // Load 3D Character Model
+            loadCharacterModel();
 
             window.addEventListener('resize', onWindowResize);
             setupJoystick();
             animate();
         }
 
-        function buildTavernEnvironment() {
-            // Stone floor
-            const floorGeo = new THREE.PlaneGeometry(50, 50);
-            const floorMat = new THREE.MeshStandardMaterial({ color: 0x1e1b2e, roughness: 0.9, metalness: 0.1 });
-            const floor = new THREE.Mesh(floorGeo, floorMat);
-            floor.rotation.x = -Math.PI / 2;
-            floor.receiveShadow = true;
-            scene.add(floor);
+        function loadCharacterModel() {
+            const loader = new GLTFLoader();
+            // Official high-quality Three.js character GLB model
+            const modelUrl = 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Soldier.glb';
 
-            // Floor Grid Accent
-            const grid = new THREE.GridHelper(50, 25, 0x6d28d9, 0x1e1b2e);
-            grid.position.y = 0.02;
-            scene.add(grid);
-
-            // Walls & Columns
-            const wallMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
-            const columnGeo = new THREE.BoxGeometry(2, 8, 2);
-
-            const positions = [
-                [-20, 4, -20], [20, 4, -20], [-20, 4, 20], [20, 4, 20],
-                [-10, 4, -20], [10, 4, -20], [-20, 4, 0], [20, 4, 0]
-            ];
-
-            positions.forEach(pos => {
-                const col = new THREE.Mesh(columnGeo, wallMat);
-                col.position.set(...pos);
-                col.castShadow = true;
-                scene.add(col);
-
-                // Add torch lights on columns
-                const torch = new THREE.PointLight(0xf59e0b, 1.5, 12);
-                torch.position.set(pos[0], 5, pos[2]);
-                scene.add(torch);
-                torchLights.push(torch);
+            loader.load(modelUrl, (gltf) => {
+                loadedCharacterMesh = gltf.scene;
+                loadedCharacterMesh.scale.set(1.5, 1.5, 1.5);
+                loadedCharacterMesh.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+                playerGroup.add(loadedCharacterMesh);
+            }, undefined, (error) => {
+                console.error("Error loading 3D model:", error);
             });
-
-            // Dungeon Exit Portal
-            const portalGeo = new THREE.TorusGeometry(3, 0.4, 16, 32);
-            const portalMat = new THREE.MeshBasicMaterial({ color: 0x8b5cf6 });
-            const portal = new THREE.Mesh(portalGeo, portalMat);
-            portal.position.set(0, 3.5, -22);
-            scene.add(portal);
-
-            const portalLight = new THREE.PointLight(0x8b5cf6, 3, 15);
-            portalLight.position.set(0, 3.5, -21);
-            scene.add(portalLight);
         }
 
-        function createPlayerModel() {
-            playerGroup = new THREE.Group();
-
-            // Stylized Character Body (Chest + Head + Lantern)
-            playerBodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.2 });
-            const bodyGeo = new THREE.CylinderGeometry(0.6, 0.4, 1.8, 12);
-            const body = new THREE.Mesh(bodyGeo, playerBodyMat);
-            body.position.y = 1.1;
-            body.castShadow = true;
-            playerGroup.add(body);
-
-            const headGeo = new THREE.SphereGeometry(0.45, 16, 16);
-            const head = new THREE.Mesh(headGeo, playerBodyMat);
-            head.position.y = 2.2;
-            playerGroup.add(head);
-
-            // Personal Lantern Light
-            const playerLight = new THREE.PointLight(0xffedd5, 1.2, 10);
-            playerLight.position.set(0, 1.8, 0.5);
-            playerGroup.add(playerLight);
-
-            scene.add(playerGroup);
-        }
-
-        function selectRace(raceKey) {
+        window.selectRace = function(raceKey) {
             currentRace = RACES[raceKey];
-            playerBodyMat.color.setHex(currentRace.color);
+            
+            // Tint character model aura/light
+            if (loadedCharacterMesh) {
+                loadedCharacterMesh.traverse((child) => {
+                    if (child.isMesh && child.material) {
+                        child.material.color.setHex(currentRace.color);
+                    }
+                });
+            }
+
             document.getElementById('race-select').style.display = 'none';
             document.getElementById('hud').style.display = 'block';
             document.getElementById('ability-btn').innerText = currentRace.abilityName;
-        }
+        };
 
-        function triggerAbility() {
+        window.triggerAbility = function() {
             if (!currentRace) return;
             const now = Date.now();
             if (now - lastAbilityTime < currentRace.cooldown) return;
@@ -203,14 +187,9 @@
             } else if (currentRace.name === 'Ghost') {
                 const origSpeed = currentRace.speed;
                 currentRace.speed *= 1.8;
-                playerBodyMat.opacity = 0.35;
-                playerBodyMat.transparent = true;
-                setTimeout(() => {
-                    currentRace.speed = origSpeed;
-                    playerBodyMat.opacity = 1.0;
-                }, 3000);
+                setTimeout(() => currentRace.speed = origSpeed, 3000);
             }
-        }
+        };
 
         function createPulseEffect(colorHex) {
             const ringGeo = new THREE.RingGeometry(0.2, 5, 32);
@@ -269,9 +248,6 @@
             requestAnimationFrame(animate);
             const delta = 0.016;
 
-            // Flicker torch lights slightly
-            torchLights.forEach(t => t.intensity = 1.3 + Math.sin(Date.now() * 0.008 + t.position.x) * 0.25);
-
             if (currentRace) {
                 if (isPouncing) {
                     playerGroup.position.addScaledVector(pounceDirection, pounceSpeed * delta);
@@ -281,7 +257,7 @@
                     playerGroup.rotation.y = Math.atan2(moveVector.x, moveVector.z);
                 }
                 camera.position.x = playerGroup.position.x;
-                camera.position.z = playerGroup.position.z + 13;
+                camera.position.z = playerGroup.position.z + 12;
                 camera.lookAt(playerGroup.position);
             }
 
